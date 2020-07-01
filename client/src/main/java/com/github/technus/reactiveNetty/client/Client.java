@@ -18,28 +18,19 @@ public class Client extends Core {
                             .doOnSuccess(nil->System.out.println("D " + connection.address()))
                             .subscribe();
                 })
-                .handle((in, out) -> {
-                    return Flux.interval(Duration.ofSeconds(1))
-                            .take(4)
-                            .flatMap(l->out.sendString(Mono.just("YEETO")))
-                            .doOnError(Throwable::printStackTrace)
-                            .then();//after all is done...
-                })
-                .connect().subscribe();
-        TcpClient.create()
-                .port(9001)
-                .doOnConnected(connection -> {
-                    System.out.println("c " + connection.address());
-                    connection.onDispose()
-                            .doOnSuccess(nil->System.out.println("D " + connection.address()))
-                            .subscribe();
-                })
-                .handle((in, out) -> {
-                    return in.receive()
-                            .map(byteBuf -> byteBuf.toString(StandardCharsets.UTF_8))
-                            .doOnNext(System.out::println)
-                            .doOnError(Throwable::printStackTrace)
-                            .then();//after all is done...
+                .handle((in, out) -> {//does not work with multiple handles
+                    return Flux.merge(//so i merge them to run both async
+                            in.receive()
+                                    .map(byteBuf -> byteBuf.toString(StandardCharsets.UTF_8))
+                                    .doOnNext(System.out::println)
+                                    .doOnError(Throwable::printStackTrace)
+                                    .then(),
+                            Flux.interval(Duration.ofSeconds(1))
+                                    .take(4)
+                                    .flatMap(l->out.sendString(Mono.just("YEETO")))
+                                    .doOnError(Throwable::printStackTrace)
+                                    .then()
+                    );//after all is done...
                 })
                 .connect().subscribe();
         Mono.never().block();
